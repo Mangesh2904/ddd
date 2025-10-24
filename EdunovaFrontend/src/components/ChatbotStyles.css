@@ -1,0 +1,138 @@
+/* Custom styles for markdown content in chatbot */
+.chatbot-message {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+}
+
+.chatbot-message .prose {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.chatbot-message .prose h1,
+.chatbot-message .prose h2,
+.chatbot-message .prose h3,
+.chatbot-message .prose h4 {
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+.chatbot-message .prose h1:first-child,
+.chatbot-message .prose h2:first-child,
+.chatbot-message .prose h3:first-child {
+  margin-top: 0;
+}
+
+.chatbot-message .prose p:last-child {
+  margin-bottom: 0;
+}
+
+.chatbot-message .prose ul:last-child,
+.chatbot-message .prose ol:last-child {
+  margin-bottom: 0;
+}
+
+/* Gradient borders */
+.gradient-border-b::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  border-radius: 1px;
+}
+
+.gradient-border-l::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, #3b82f6, #8b5cf6);
+  border-radius: 2px;
+}
+
+/* Smooth scrolling for chat messages */
+.chat-container {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+.chat-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-container::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5);
+  border-radius: 3px;
+}
+
+.chat-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.7);
+}
+
+/* Dark mode scrollbar */
+.dark .chat-container::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.5);
+}
+
+.dark .chat-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(75, 85, 99, 0.7);
+}
+
+/* Animation for new messages */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-enter {
+  animation: slideInUp 0.3s ease-out;
+}
+
+/* Typing indicator animation */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.typing-dots {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Enhanced focus states */
+.chat-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: #3b82f6;
+}
+
+/* Message bubble hover effects */
+.message-bubble {
+  transition: all 0.2s ease;
+}
+
+.message-bubble:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dark .message-bubble:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
