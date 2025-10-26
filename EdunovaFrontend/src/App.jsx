@@ -1,7 +1,6 @@
-import React, { useState } from 'react'
-import { BrowserRouter as Router, Route, Routes, Link } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { BrowserRouter as Router, Route, Routes, Link, Navigate, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { BookOpen, MessageCircle, CheckSquare, Home as HomeIcon, Menu, LogIn, LogOut } from 'lucide-react'
 
 // Importing components and pages
 import Navbar from './components/Navbar'
@@ -17,76 +16,157 @@ import Login from './pages/Login'
 import Signup from './pages/Signup'
 import PlacementPrep from './pages/PlacementPrep'
 
+// Protected Route Component
+const ProtectedRoute = ({ children }) => {
+  const token = localStorage.getItem('token');
+  const location = useLocation();
+  
+  if (!token) {
+    // Redirect to login if not authenticated
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+  
+  return children;
+};
+
+// Public Route Component (redirect to home if already logged in)
+const PublicRoute = ({ children }) => {
+  const token = localStorage.getItem('token');
+  
+  if (token) {
+    // Redirect to home if already authenticated
+    return <Navigate to="/" replace />;
+  }
+  
+  return children;
+};
+
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('token'))
 
+  // Update login state when storage changes
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setIsLoggedIn(!!localStorage.getItem('token'));
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   return (
     <Router>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-indigo-900 text-gray-900 dark:text-gray-100">
-        <Navbar setIsSidebarOpen={setIsSidebarOpen} isLoggedIn={isLoggedIn} setIsLoggedIn={setIsLoggedIn} />
-        <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
-        <main className="pt-16 px-4 md:px-8 lg:px-16 transition-all duration-300 ease-in-out">
+        {/* Show Navbar and Sidebar only when logged in */}
+        {isLoggedIn && (
+          <>
+            <Navbar setIsSidebarOpen={setIsSidebarOpen} isLoggedIn={isLoggedIn} setIsLoggedIn={setIsLoggedIn} />
+            <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+            <ChatbotFloater />
+          </>
+        )}
+        
+        <main className={isLoggedIn ? "pt-16 px-4 md:px-8 lg:px-16 transition-all duration-300 ease-in-out" : ""}>
           <AnimatePresence mode="wait">
             <Routes>
+              {/* Public Routes */}
+              <Route path="/login" element={
+                <PublicRoute>
+                  <Login setIsLoggedIn={setIsLoggedIn} />
+                </PublicRoute>
+              } />
+              <Route path="/signup" element={
+                <PublicRoute>
+                  <Signup />
+                </PublicRoute>
+              } />
+
+              {/* Protected Routes */}
               <Route path="/" element={
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Home />
-                </motion.div>
+                <ProtectedRoute>
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <Home />
+                  </motion.div>
+                </ProtectedRoute>
               } />
+              
               <Route path="/roadmap" element={
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Roadmap />
-                </motion.div>
+                <ProtectedRoute>
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <Roadmap />
+                  </motion.div>
+                </ProtectedRoute>
               } />
+              
               <Route path="/chatbot" element={
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 1.1 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Chatbot />
-                </motion.div>
+                <ProtectedRoute>
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 1.1 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <Chatbot />
+                  </motion.div>
+                </ProtectedRoute>
               } />
+              
               <Route path="/checklist" element={
-                <motion.div
-                  initial={{ opacity: 0, y: -20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 20 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Checklist />
-                </motion.div>
+                <ProtectedRoute>
+                  <motion.div
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <Checklist />
+                  </motion.div>
+                </ProtectedRoute>
               } />
+              
               <Route path="/placement-prep" element={
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <PlacementPrep />
-                </motion.div>
+                <ProtectedRoute>
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <PlacementPrep />
+                  </motion.div>
+                </ProtectedRoute>
               } />
-              <Route path="/chat-history" element={<ChatHistory />} />
-              <Route path="/roadmap-history" element={<RoadmapHistory />} />
-              <Route path="/login" element={<Login setIsLoggedIn={setIsLoggedIn} />} />
-              <Route path="/signup" element={<Signup />} />
+              
+              <Route path="/chat-history" element={
+                <ProtectedRoute>
+                  <ChatHistory />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/roadmap-history" element={
+                <ProtectedRoute>
+                  <RoadmapHistory />
+                </ProtectedRoute>
+              } />
+
+              {/* Catch all - redirect to login if not authenticated, home if authenticated */}
+              <Route path="*" element={
+                isLoggedIn ? <Navigate to="/" replace /> : <Navigate to="/login" replace />
+              } />
             </Routes>
           </AnimatePresence>
         </main>
-        <ChatbotFloater />
       </div>
     </Router>
   )

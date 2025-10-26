@@ -160,9 +160,15 @@ function formatRoadmapToMarkdown(roadmap) {
       }
 
       if (week.youtube_videos) {
-        md += `#### YouTube Videos\n`;
+        md += `#### 🎥 YouTube Resources\n`;
         week.youtube_videos.forEach(v => {
-          md += `- [${v.title}](${v.url}) by ${v.channel}\n`;
+          if (v.search_query) {
+            md += `- **${v.title}** by ${v.channel}\n`;
+            md += `  - 🔍 Search: \`${v.search_query}\`\n`;
+            if (v.type) md += `  - Type: ${v.type}\n`;
+          } else if (v.url) {
+            md += `- [${v.title}](${v.url}) by ${v.channel}\n`;
+          }
         });
         md += `\n`;
       }

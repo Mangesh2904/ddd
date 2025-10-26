@@ -6,13 +6,16 @@ import {
   Loader, 
   Building2, 
   Target, 
-  CheckCircle2, 
-  XCircle, 
-  Brain,
+  XCircle,
   BookOpen,
-  Award,
-  RefreshCw,
-  ChevronRight,
+  Youtube,
+  Code,
+  FileText,
+  Github,
+  BookMarked,
+  GraduationCap,
+  Briefcase,
+  ExternalLink,
   Lightbulb
 } from 'lucide-react';
 import MarkdownRenderer from '../components/MarkdownRenderer';
@@ -28,15 +31,10 @@ const PlacementPrep = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [role, setRole] = useState('');
   const [customRole, setCustomRole] = useState('');
-  const [questions, setQuestions] = useState([]);
-  const [concepts, setConcepts] = useState('');
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedAnswers, setSelectedAnswers] = useState({});
-  const [showResults, setShowResults] = useState(false);
-  const [score, setScore] = useState(0);
+  const [guidance, setGuidance] = useState('');
+  const [resources, setResources] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('questions'); // 'questions' or 'concepts'
 
   // Debounced company search
   useEffect(() => {
@@ -79,11 +77,8 @@ const PlacementPrep = () => {
 
     setIsLoading(true);
     setError(null);
-    setQuestions([]);
-    setConcepts('');
-    setSelectedAnswers({});
-    setShowResults(false);
-    setCurrentQuestionIndex(0);
+    setGuidance('');
+    setResources(null);
     if (role !== 'custom') {
       setCustomRole('');
     }
@@ -113,8 +108,8 @@ const PlacementPrep = () => {
       }
 
       const data = await response.json();
-      setQuestions(data.questions);
-      setConcepts(data.concepts);
+      setGuidance(data.guidance);
+      setResources(data.resources);
     } catch (error) {
       console.error('Error generating placement content:', error);
       setError(error.message);
@@ -123,51 +118,186 @@ const PlacementPrep = () => {
     }
   };
 
-  const handleAnswerSelect = (questionIndex, selectedOption) => {
-    setSelectedAnswers(prev => ({
-      ...prev,
-      [questionIndex]: selectedOption
-    }));
+  const ResourceIcon = ({ type }) => {
+    const iconMap = {
+      youtube: Youtube,
+      coding_practice: Code,
+      articles: FileText,
+      github_repos: Github,
+      documentation: BookMarked,
+      courses: GraduationCap,
+      books: BookOpen,
+      company_specific: Briefcase
+    };
+    const Icon = iconMap[type] || Lightbulb;
+    return <Icon className="w-5 h-5" />;
   };
 
-  const calculateScore = () => {
-    let correctAnswers = 0;
-    questions.forEach((question, index) => {
-      if (selectedAnswers[index] === question.correctAnswer) {
-        correctAnswers++;
+  const handleResourceClick = (item, type) => {
+    let searchUrl = '';
+    
+    if (item.search_query) {
+      // For resources with search queries
+      if (type === 'youtube' || item.channel) {
+        // YouTube search
+        searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(item.search_query)}`;
+      } else if (type === 'github_repos') {
+        // GitHub search
+        searchUrl = `https://github.com/search?q=${encodeURIComponent(item.search_query)}&type=repositories`;
+      } else if (type === 'coding_practice') {
+        // Google search for coding platforms
+        searchUrl = `https://www.google.com/search?q=${encodeURIComponent(item.platform + ' ' + item.search_query)}`;
+      } else {
+        // General Google search
+        searchUrl = `https://www.google.com/search?q=${encodeURIComponent(item.search_query)}`;
       }
-    });
-    setScore(correctAnswers);
-    setShowResults(true);
-  };
-
-  const resetQuiz = () => {
-    setSelectedAnswers({});
-    setShowResults(false);
-    setCurrentQuestionIndex(0);
-    setScore(0);
-  };
-
-  const nextQuestion = () => {
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    } else if (item.platform) {
+      // Platform-specific searches
+      if (item.platform === 'LeetCode') {
+        searchUrl = `https://leetcode.com/problemset/`;
+      } else if (item.platform === 'HackerRank') {
+        searchUrl = `https://www.hackerrank.com/domains`;
+      } else if (item.platform === 'InterviewBit') {
+        searchUrl = `https://www.interviewbit.com/practice/`;
+      } else if (item.platform === 'CodeSignal') {
+        searchUrl = `https://codesignal.com/developers/`;
+      } else if (item.platform === 'GeeksforGeeks') {
+        searchUrl = `https://www.geeksforgeeks.org/`;
+      } else if (item.platform === 'Medium' || item.platform === 'Dev.to') {
+        searchUrl = `https://www.google.com/search?q=${encodeURIComponent(item.title + ' ' + item.platform)}`;
+      } else {
+        searchUrl = `https://www.google.com/search?q=${encodeURIComponent(item.platform + ' ' + item.title)}`;
+      }
+    } else if (item.how_to_find) {
+      // Use Google search for how_to_find instructions
+      searchUrl = `https://www.google.com/search?q=${encodeURIComponent(item.title)}`;
+    } else {
+      // Default: Google search with title
+      searchUrl = `https://www.google.com/search?q=${encodeURIComponent(item.title + ' ' + (item.author || item.channel || ''))}`;
     }
+    
+    // Open in new tab
+    window.open(searchUrl, '_blank', 'noopener,noreferrer');
   };
 
-  const prevQuestion = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(currentQuestionIndex - 1);
-    }
-  };
+  const renderResourceSection = (title, items, type) => {
+    if (!items || items.length === 0) return null;
 
-  const getScoreColor = () => {
-    const percentage = (score / questions.length) * 100;
-    if (percentage >= 80) return 'text-green-600';
-    if (percentage >= 60) return 'text-yellow-600';
-    return 'text-red-600';
-  };
+    const getSectionColor = () => {
+      const colors = {
+        youtube: 'from-red-500 to-red-600',
+        coding_practice: 'from-green-500 to-green-600',
+        articles: 'from-blue-500 to-blue-600',
+        github_repos: 'from-purple-500 to-purple-600',
+        documentation: 'from-indigo-500 to-indigo-600',
+        courses: 'from-orange-500 to-orange-600',
+        books: 'from-pink-500 to-pink-600',
+        company_specific: 'from-teal-500 to-teal-600'
+      };
+      return colors[type] || 'from-gray-500 to-gray-600';
+    };
 
-  const currentQuestion = questions[currentQuestionIndex];
+    return (
+      <div className="mb-8">
+        <div className={`flex items-center space-x-3 mb-4 bg-gradient-to-r ${getSectionColor()} text-white px-4 py-3 rounded-lg`}>
+          <ResourceIcon type={type} />
+          <h3 className="text-xl font-bold">{title}</h3>
+          <span className="ml-auto bg-white/20 px-3 py-1 rounded-full text-sm font-medium">
+            {items.length} {items.length === 1 ? 'Resource' : 'Resources'}
+          </span>
+        </div>
+        <div className="grid grid-cols-1 gap-4">
+          {items.map((item, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05 }}
+              onClick={() => handleResourceClick(item, type)}
+              className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-md border border-gray-200 dark:border-gray-700 hover:shadow-lg hover:border-blue-400 dark:hover:border-blue-600 transition-all cursor-pointer group"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-grow">
+                  <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                    {item.title}
+                  </h4>
+                  {item.channel && (
+                    <p className="text-sm text-blue-600 dark:text-blue-400 mb-1">
+                      Channel: {item.channel}
+                    </p>
+                  )}
+                  {item.platform && (
+                    <p className="text-sm text-purple-600 dark:text-purple-400 mb-1">
+                      Platform: {item.platform}
+                    </p>
+                  )}
+                  {item.author && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Author: {item.author}
+                    </p>
+                  )}
+                  {item.difficulty && (
+                    <span className={`inline-block text-xs px-2 py-1 rounded-full mb-2 ${
+                      item.difficulty === 'Easy' ? 'bg-green-100 text-green-800' :
+                      item.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                      item.difficulty === 'Hard' ? 'bg-red-100 text-red-800' :
+                      'bg-blue-100 text-blue-800'
+                    }`}>
+                      {item.difficulty}
+                    </span>
+                  )}
+                  <p className="text-gray-700 dark:text-gray-300 text-sm mb-2">
+                    {item.description}
+                  </p>
+                  {item.link_description && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400 italic">
+                      💡 {item.link_description}
+                    </p>
+                  )}
+                  {item.search_query && (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mt-2">
+                      <p className="text-sm text-blue-800 dark:text-blue-300 font-medium">
+                        🔍 Click to search: "{item.search_query}"
+                      </p>
+                    </div>
+                  )}
+                  {item.how_to_find && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400 italic mt-2">
+                      📍 {item.how_to_find}
+                    </p>
+                  )}
+                  {item.relevance && (
+                    <p className="text-sm text-green-600 dark:text-green-400 mt-2">
+                      ✓ {item.relevance}
+                    </p>
+                  )}
+                  {item.topics && item.topics.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {item.topics.map((topic, idx) => (
+                        <span key={idx} className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded">
+                          {topic}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <button 
+                  className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/40 transition-colors flex-shrink-0 ml-4"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleResourceClick(item, type);
+                  }}
+                  title="Open resource"
+                >
+                  <ExternalLink className="w-5 h-5" />
+                </button>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <motion.div 
@@ -185,10 +315,10 @@ const PlacementPrep = () => {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-4 flex items-center justify-center">
             <Building2 className="w-8 h-8 mr-3" />
-            Placement Preparation
+            Placement Preparation Guide
           </h1>
           <p className="text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-            Get company-specific interview questions and important concepts to ace your placement interviews
+            Get comprehensive, company-specific interview guidance and curated resources to ace your placement
           </p>
         </div>
 
@@ -300,18 +430,18 @@ const PlacementPrep = () => {
               {isLoading ? (
                 <>
                   <Loader className="w-5 h-5 animate-spin mr-2" />
-                  Generating...
+                  Generating Guide...
                 </>
               ) : (
                 <>
                   <Target className="w-5 h-5 mr-2" />
-                  Generate Prep Material
+                  Generate Prep Guide
                 </>
               )}
             </button>
           </div>
           <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 text-center">
-            Get tailored interview questions and key concepts for your target company
+            Get personalized interview guidance and curated learning resources
           </div>
         </motion.div>
 
@@ -341,187 +471,65 @@ const PlacementPrep = () => {
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 max-w-md text-center">
               <Loader className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-500" />
               <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
-                Preparing Your Interview Material
+                Preparing Your Guide
               </h3>
               <p className="text-gray-600 dark:text-gray-300">
-                Generating {role === 'custom' ? customRole : role} questions and concepts for {companyName}...
+                Generating comprehensive preparation material for {role === 'custom' ? customRole : role} at {companyName}...
               </p>
             </div>
           </motion.div>
         )}
 
         {/* Main Content */}
-        {!isLoading && questions.length > 0 && concepts && (
+        {!isLoading && guidance && resources && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="grid grid-cols-1 lg:grid-cols-2 gap-8"
+            className="space-y-8"
           >
-            {/* Questions Section */}
+            {/* Guidance Section */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
               <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-6 text-white">
-                <h2 className="text-xl font-bold flex items-center">
-                  <Brain className="w-6 h-6 mr-3" />
-                  Interview Questions
+                <h2 className="text-2xl font-bold flex items-center">
+                  <Lightbulb className="w-6 h-6 mr-3" />
+                  Interview Preparation Guide
                 </h2>
                 <p className="opacity-90 mt-1">
                   {companyName} - {role === 'custom' ? customRole : role} Position
                 </p>
               </div>
 
-              <div className="p-6">
-                {!showResults ? (
-                  <>
-                    {/* Question Navigation */}
-                    <div className="flex items-center justify-between mb-6">
-                      <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                        Question {currentQuestionIndex + 1} of {questions.length}
-                      </span>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={prevQuestion}
-                          disabled={currentQuestionIndex === 0}
-                          className="p-2 rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700"
-                        >
-                          <ArrowLeft className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={nextQuestion}
-                          disabled={currentQuestionIndex === questions.length - 1}
-                          className="p-2 rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700"
-                        >
-                          <ChevronRight className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-6">
-                      <div 
-                        className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
-                      />
-                    </div>
-
-                    {/* Current Question */}
-                    {currentQuestion && (
-                      <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-gray-800 dark:text-white leading-relaxed">
-                          {currentQuestion.question}
-                        </h3>
-                        
-                        <div className="space-y-3">
-                          {currentQuestion.options.map((option, optionIndex) => (
-                            <button
-                              key={optionIndex}
-                              onClick={() => handleAnswerSelect(currentQuestionIndex, optionIndex)}
-                              className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 ${
-                                selectedAnswers[currentQuestionIndex] === optionIndex
-                                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                                  : 'border-gray-200 dark:border-gray-600 hover:border-blue-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                              }`}
-                            >
-                              <div className="flex items-center">
-                                <span className={`w-6 h-6 rounded-full border-2 mr-3 flex items-center justify-center text-xs font-bold ${
-                                  selectedAnswers[currentQuestionIndex] === optionIndex
-                                    ? 'border-blue-500 bg-blue-500 text-white'
-                                    : 'border-gray-300'
-                                }`}>
-                                  {String.fromCharCode(65 + optionIndex)}
-                                </span>
-                                <span className="text-gray-800 dark:text-white">{option}</span>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Submit Quiz Button */}
-                    <div className="mt-8 flex justify-center">
-                      <button
-                        onClick={calculateScore}
-                        disabled={Object.keys(selectedAnswers).length !== questions.length}
-                        className="bg-gradient-to-r from-green-500 to-green-600 text-white px-8 py-3 rounded-xl hover:from-green-600 hover:to-green-700 transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg font-semibold flex items-center"
-                      >
-                        <Award className="w-5 h-5 mr-2" />
-                        Submit Quiz
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  /* Results Section */
-                  <div className="text-center space-y-6">
-                    <div className={`text-6xl font-bold ${getScoreColor()}`}>
-                      {score}/{questions.length}
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
-                        Quiz Completed!
-                      </h3>
-                      <p className="text-gray-600 dark:text-gray-400">
-                        You scored {Math.round((score / questions.length) * 100)}% on {companyName} interview questions
-                      </p>
-                    </div>
-
-                    {/* Detailed Results */}
-                    <div className="space-y-3 max-h-64 overflow-y-auto">
-                      {questions.map((question, index) => (
-                        <div
-                          key={index}
-                          className={`p-4 rounded-lg border-l-4 ${
-                            selectedAnswers[index] === question.correctAnswer
-                              ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
-                              : 'border-red-500 bg-red-50 dark:bg-red-900/20'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between">
-                            <span className="text-sm text-gray-600 dark:text-gray-400 flex-grow">
-                              Q{index + 1}: {question.question.substring(0, 50)}...
-                            </span>
-                            {selectedAnswers[index] === question.correctAnswer ? (
-                              <CheckCircle2 className="w-5 h-5 text-green-500" />
-                            ) : (
-                              <XCircle className="w-5 h-5 text-red-500" />
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <button
-                      onClick={resetQuiz}
-                      className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-8 py-3 rounded-xl hover:from-blue-600 hover:to-purple-700 transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-lg font-semibold flex items-center mx-auto"
-                    >
-                      <RefreshCw className="w-5 h-5 mr-2" />
-                      Retake Quiz
-                    </button>
-                  </div>
-                )}
+              <div className="p-8 chatbot-message max-h-[600px] overflow-y-auto">
+                <MarkdownRenderer content={guidance} />
               </div>
             </div>
 
-            {/* Concepts Section */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <div className="bg-gradient-to-r from-green-500 to-teal-600 p-6 text-white">
-                <h2 className="text-xl font-bold flex items-center">
-                  <Lightbulb className="w-6 h-6 mr-3" />
-                  Key Concepts
+            {/* Resources Section */}
+            <div className="bg-gradient-to-br from-green-50 to-teal-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-8">
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-2 flex items-center justify-center">
+                  <BookOpen className="w-8 h-8 mr-3 text-green-600" />
+                  Learning Resources
                 </h2>
-                <p className="opacity-90 mt-1">
-                  Important topics for {companyName} - {role === 'custom' ? customRole : role}
+                <p className="text-gray-600 dark:text-gray-300">
+                  Curated resources to help you prepare effectively
                 </p>
               </div>
 
-              <div className="p-6 chatbot-message max-h-[600px] overflow-y-auto">
-                <MarkdownRenderer content={concepts} />
-              </div>
+              {resources.youtube && renderResourceSection('📺 YouTube Videos & Playlists', resources.youtube, 'youtube')}
+              {resources.coding_practice && renderResourceSection('💻 Coding Practice Platforms', resources.coding_practice, 'coding_practice')}
+              {resources.articles && renderResourceSection('📄 Articles & Blogs', resources.articles, 'articles')}
+              {resources.github_repos && renderResourceSection('⚡ GitHub Repositories', resources.github_repos, 'github_repos')}
+              {resources.documentation && renderResourceSection('📚 Documentation & Guides', resources.documentation, 'documentation')}
+              {resources.courses && renderResourceSection('🎓 Online Courses', resources.courses, 'courses')}
+              {resources.books && renderResourceSection('📖 Recommended Books', resources.books, 'books')}
+              {resources.company_specific && renderResourceSection('🏢 Company-Specific Resources', resources.company_specific, 'company_specific')}
             </div>
           </motion.div>
         )}
 
         {/* Empty State */}
-        {!isLoading && questions.length === 0 && !concepts && !error && (
+        {!isLoading && !guidance && !resources && !error && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -532,8 +540,7 @@ const PlacementPrep = () => {
               Ready to Ace Your Interview?
             </h3>
             <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
-              Enter your target company name and role above to get personalized interview questions 
-              and important concepts to study.
+              Enter your target company and role above to get a comprehensive preparation guide with curated resources.
             </p>
           </motion.div>
         )}

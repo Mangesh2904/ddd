@@ -51,11 +51,40 @@ export const generateContent = async (prompt, maxTokens = 4096) => {
 export const generateStructuredRoadmap = async (topic, weeks) => {
   const prompt = `Generate a comprehensive ${weeks}-week learning roadmap for "${topic}".
 
-CRITICAL REQUIREMENTS:
-1. MUST include 2-3 YouTube video links per week (with real URLs, titles, and channels)
-2. MUST include hands-on projects (at least one per week)
-3. Topics should be specific and actionable
-4. Projects should build on each other progressively
+CRITICAL INSTRUCTIONS FOR YOUTUBE RECOMMENDATIONS:
+1. Provide 2-3 YouTube video/playlist SEARCH RECOMMENDATIONS per week
+2. Use DIVERSE, HIGH-QUALITY educational channels (mix different creators, don't repeat same channels)
+3. ONLY recommend content from channels known for ${topic}
+4. Content should be recent (uploaded within last 2-2.5 years when possible)
+
+RECOMMENDED CHANNELS BY CATEGORY:
+**Web Development:**
+- Traversy Media, The Net Ninja, Kevin Powell, Web Dev Simplified, Fireship, Dave Gray, JavaScript Mastery, Coding Addict
+
+**Programming/CS:**
+- freeCodeCamp, Programming with Mosh, Tech With Tim, Corey Schafer, CS Dojo, CodeWithHarry
+
+**Python/Data Science:**
+- Tech With Tim, Corey Schafer, Krish Naik, CodeBasics, sentdex, Keith Galli
+
+**React/Frontend:**
+- Traversy Media, JavaScript Mastery, Academind, PedroTech, Coding Addict, Dave Gray
+
+**Backend/Databases:**
+- Traversy Media, Hussein Nasser, Fireship, Ben Awad, Caleb Curry
+
+**DevOps/Cloud:**
+- TechWorld with Nana, Fireship, NetworkChuck, Cloud Advocate
+
+**Mobile Development:**
+- The Net Ninja, Academind, Traversy Media, Programming with Mosh
+
+IMPORTANT:
+- For each recommendation, provide SEARCH INSTRUCTIONS (e.g., "Search: React Complete Course 2024 Traversy Media")
+- DO NOT generate fake video URLs
+- Provide channel name + specific search query
+- Vary the channels across weeks
+- Mention if it's a full course/tutorial/crash course
 
 Return ONLY valid JSON in this exact format:
 {
@@ -71,10 +100,10 @@ Return ONLY valid JSON in this exact format:
       "topics": ["topic1", "topic2", "topic3"],
       "youtube_videos": [
         {
-          "title": "<video title>",
-          "url": "https://www.youtube.com/watch?v=...",
+          "title": "<Specific topic/concept to learn>",
+          "search_query": "<Channel Name> <Specific search terms> <Year if relevant>",
           "channel": "<channel name>",
-          "duration": "<duration>"
+          "type": "Full Course|Tutorial|Crash Course|Playlist"
         }
       ],
       "difficulty": "Beginner|Intermediate|Advanced",
@@ -90,12 +119,25 @@ Return ONLY valid JSON in this exact format:
       "estimated_hours": <number>
     }
   ]
+}
+
+EXAMPLE:
+{
+  "youtube_videos": [
+    {
+      "title": "React Fundamentals and Hooks",
+      "search_query": "Traversy Media React Crash Course 2024",
+      "channel": "Traversy Media",
+      "type": "Crash Course"
+    }
+  ]
 }`;
 
   try {
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
     
+    // Extract JSON from response
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error('No valid JSON found in response');
@@ -103,9 +145,24 @@ Return ONLY valid JSON in this exact format:
 
     const roadmapData = JSON.parse(jsonMatch[0]);
     
+    // Validate structure
     if (!roadmapData.milestones || roadmapData.milestones.length === 0) {
       throw new Error('Invalid roadmap structure: missing milestones');
     }
+
+    // Validate YouTube links format
+    roadmapData.milestones.forEach((milestone, idx) => {
+      if (milestone.youtube_videos) {
+        milestone.youtube_videos = milestone.youtube_videos.map(video => {
+          // Ensure required fields exist
+          if (!video.search_query && !video.url) {
+            console.warn(`Missing search_query in week ${idx + 1}`);
+            video.search_query = `${video.channel} ${video.title}`;
+          }
+          return video;
+        });
+      }
+    });
 
     return roadmapData;
   } catch (error) {
