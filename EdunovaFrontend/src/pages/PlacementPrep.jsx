@@ -26,42 +26,12 @@ const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const PlacementPrep = () => {
   const [companyName, setCompanyName] = useState('');
-  const [companySuggestions, setCompanySuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
   const [role, setRole] = useState('');
   const [customRole, setCustomRole] = useState('');
   const [guidance, setGuidance] = useState('');
   const [resources, setResources] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  // Debounced company search
-  useEffect(() => {
-    const searchCompanies = async () => {
-      if (companyName.trim().length < 2) {
-        setCompanySuggestions([]);
-        return;
-      }
-
-      setIsSearching(true);
-      try {
-        const response = await fetch(`${apiUrl}/api/placement/companies/search?query=${encodeURIComponent(companyName)}`);
-        if (response.ok) {
-          const data = await response.json();
-          setCompanySuggestions(data.companies || []);
-          setShowSuggestions(true);
-        }
-      } catch (error) {
-        console.error('Error searching companies:', error);
-      } finally {
-        setIsSearching(false);
-      }
-    };
-
-    const timer = setTimeout(searchCompanies, 300);
-    return () => clearTimeout(timer);
-  }, [companyName]);
 
   const generatePlacementContent = async () => {
     if (!companyName.trim()) {
@@ -134,67 +104,38 @@ const PlacementPrep = () => {
   };
 
   const handleResourceClick = (item, type) => {
-    let searchUrl = '';
+    let targetUrl = '';
     
-    if (item.search_query) {
-      // For resources with search queries
+    // Check if item has a direct URL (preferred)
+    if (item.url) {
+      targetUrl = item.url;
+    } else if (item.search_query) {
+      // Fallback to search if no direct URL
       if (type === 'youtube' || item.channel) {
         // YouTube search
-        searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(item.search_query)}`;
-      } else if (type === 'github_repos') {
-        // GitHub search
-        searchUrl = `https://github.com/search?q=${encodeURIComponent(item.search_query)}&type=repositories`;
-      } else if (type === 'coding_practice') {
-        // Google search for coding platforms
-        searchUrl = `https://www.google.com/search?q=${encodeURIComponent(item.platform + ' ' + item.search_query)}`;
+        targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(item.search_query)}`;
       } else {
         // General Google search
-        searchUrl = `https://www.google.com/search?q=${encodeURIComponent(item.search_query)}`;
+        targetUrl = `https://www.google.com/search?q=${encodeURIComponent(item.search_query)}`;
       }
-    } else if (item.platform) {
-      // Platform-specific searches
-      if (item.platform === 'LeetCode') {
-        searchUrl = `https://leetcode.com/problemset/`;
-      } else if (item.platform === 'HackerRank') {
-        searchUrl = `https://www.hackerrank.com/domains`;
-      } else if (item.platform === 'InterviewBit') {
-        searchUrl = `https://www.interviewbit.com/practice/`;
-      } else if (item.platform === 'CodeSignal') {
-        searchUrl = `https://codesignal.com/developers/`;
-      } else if (item.platform === 'GeeksforGeeks') {
-        searchUrl = `https://www.geeksforgeeks.org/`;
-      } else if (item.platform === 'Medium' || item.platform === 'Dev.to') {
-        searchUrl = `https://www.google.com/search?q=${encodeURIComponent(item.title + ' ' + item.platform)}`;
-      } else {
-        searchUrl = `https://www.google.com/search?q=${encodeURIComponent(item.platform + ' ' + item.title)}`;
-      }
-    } else if (item.how_to_find) {
-      // Use Google search for how_to_find instructions
-      searchUrl = `https://www.google.com/search?q=${encodeURIComponent(item.title)}`;
     } else {
-      // Default: Google search with title
-      searchUrl = `https://www.google.com/search?q=${encodeURIComponent(item.title + ' ' + (item.author || item.channel || ''))}`;
+      // Last resort: search by title and channel
+      const searchTerm = `${item.title} ${item.channel || ''}`.trim();
+      targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(searchTerm)}`;
     }
     
     // Open in new tab
-    window.open(searchUrl, '_blank', 'noopener,noreferrer');
+    window.open(targetUrl, '_blank', 'noopener,noreferrer');
   };
 
   const renderResourceSection = (title, items, type) => {
     if (!items || items.length === 0) return null;
 
+    // Only render YouTube resources
+    if (type !== 'youtube') return null;
+
     const getSectionColor = () => {
-      const colors = {
-        youtube: 'from-red-500 to-red-600',
-        coding_practice: 'from-green-500 to-green-600',
-        articles: 'from-blue-500 to-blue-600',
-        github_repos: 'from-purple-500 to-purple-600',
-        documentation: 'from-indigo-500 to-indigo-600',
-        courses: 'from-orange-500 to-orange-600',
-        books: 'from-pink-500 to-pink-600',
-        company_specific: 'from-teal-500 to-teal-600'
-      };
-      return colors[type] || 'from-gray-500 to-gray-600';
+      return 'from-red-500 to-red-600';
     };
 
     return (
@@ -226,59 +167,31 @@ const PlacementPrep = () => {
                       Channel: {item.channel}
                     </p>
                   )}
-                  {item.platform && (
-                    <p className="text-sm text-purple-600 dark:text-purple-400 mb-1">
-                      Platform: {item.platform}
-                    </p>
-                  )}
-                  {item.author && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                      Author: {item.author}
-                    </p>
-                  )}
-                  {item.difficulty && (
-                    <span className={`inline-block text-xs px-2 py-1 rounded-full mb-2 ${
-                      item.difficulty === 'Easy' ? 'bg-green-100 text-green-800' :
-                      item.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                      item.difficulty === 'Hard' ? 'bg-red-100 text-red-800' :
-                      'bg-blue-100 text-blue-800'
-                    }`}>
-                      {item.difficulty}
+                  {item.type && (
+                    <span className="inline-block text-xs px-2 py-1 rounded-full mb-2 bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
+                      {item.type}
                     </span>
                   )}
                   <p className="text-gray-700 dark:text-gray-300 text-sm mb-2">
                     {item.description}
                   </p>
-                  {item.link_description && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400 italic">
-                      💡 {item.link_description}
-                    </p>
-                  )}
-                  {item.search_query && (
+                  {item.url ? (
+                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 mt-2">
+                      <p className="text-sm text-green-800 dark:text-green-300 font-medium">
+                        🎬 Click to watch: Direct YouTube link
+                      </p>
+                    </div>
+                  ) : item.search_query && (
                     <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mt-2">
                       <p className="text-sm text-blue-800 dark:text-blue-300 font-medium">
                         🔍 Click to search: "{item.search_query}"
                       </p>
                     </div>
                   )}
-                  {item.how_to_find && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400 italic mt-2">
-                      📍 {item.how_to_find}
-                    </p>
-                  )}
                   {item.relevance && (
                     <p className="text-sm text-green-600 dark:text-green-400 mt-2">
                       ✓ {item.relevance}
                     </p>
-                  )}
-                  {item.topics && item.topics.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {item.topics.map((topic, idx) => (
-                        <span key={idx} className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded">
-                          {topic}
-                        </span>
-                      ))}
-                    </div>
                   )}
                 </div>
                 <button 
@@ -332,51 +245,19 @@ const PlacementPrep = () => {
             Choose Your Target Company & Role
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div className="relative">
+            <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Company Name
               </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={companyName}
-                  onChange={(e) => {
-                    setCompanyName(e.target.value);
-                    setShowSuggestions(true);
-                  }}
-                  onKeyPress={(e) => e.key === 'Enter' && !showSuggestions && generatePlacementContent()}
-                  onFocus={() => companySuggestions.length > 0 && setShowSuggestions(true)}
-                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                  placeholder="Type to search companies..."
-                  className="w-full p-4 border-0 bg-gray-50 dark:bg-gray-700 rounded-xl text-gray-800 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={isLoading}
-                  autoComplete="off"
-                />
-                {isSearching && (
-                  <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
-                    <Loader className="w-4 h-4 animate-spin text-blue-500" />
-                  </div>
-                )}
-              </div>
-              
-              {/* Autocomplete Dropdown */}
-              {showSuggestions && companySuggestions.length > 0 && (
-                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 max-h-60 overflow-y-auto">
-                  {companySuggestions.map((company, index) => (
-                    <div
-                      key={index}
-                      onClick={() => {
-                        setCompanyName(company);
-                        setShowSuggestions(false);
-                      }}
-                      className="px-4 py-3 hover:bg-blue-50 dark:hover:bg-gray-700 cursor-pointer transition-colors flex items-center"
-                    >
-                      <Building2 className="w-4 h-4 mr-2 text-blue-500" />
-                      <span className="text-gray-800 dark:text-white">{company}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <input
+                type="text"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && generatePlacementContent()}
+                placeholder="Enter company name (e.g., Google, Microsoft, Amazon)"
+                className="w-full p-4 border-0 bg-gray-50 dark:bg-gray-700 rounded-xl text-gray-800 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isLoading}
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -517,13 +398,14 @@ const PlacementPrep = () => {
               </div>
 
               {resources.youtube && renderResourceSection('📺 YouTube Videos & Playlists', resources.youtube, 'youtube')}
-              {resources.coding_practice && renderResourceSection('💻 Coding Practice Platforms', resources.coding_practice, 'coding_practice')}
-              {resources.articles && renderResourceSection('📄 Articles & Blogs', resources.articles, 'articles')}
-              {resources.github_repos && renderResourceSection('⚡ GitHub Repositories', resources.github_repos, 'github_repos')}
-              {resources.documentation && renderResourceSection('📚 Documentation & Guides', resources.documentation, 'documentation')}
-              {resources.courses && renderResourceSection('🎓 Online Courses', resources.courses, 'courses')}
-              {resources.books && renderResourceSection('📖 Recommended Books', resources.books, 'books')}
-              {resources.company_specific && renderResourceSection('🏢 Company-Specific Resources', resources.company_specific, 'company_specific')}
+              
+              {(!resources.youtube || resources.youtube.length === 0) && (
+                <div className="text-center py-8 text-gray-600 dark:text-gray-400">
+                  <Youtube className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>No YouTube resources available at the moment.</p>
+                  <p className="text-sm mt-2">Try searching on YouTube directly for "{role} at {companyName}"</p>
+                </div>
+              )}
             </div>
           </motion.div>
         )}

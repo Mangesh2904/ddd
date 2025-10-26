@@ -1,5 +1,31 @@
 ﻿import { generateStructuredRoadmap } from '../services/geminiService.js';
+import { searchYouTubeVideos } from '../services/perplexityService.js';
 import Roadmap from '../models/Roadmap.js';
+
+// Test endpoint for Perplexity API
+export const testPerplexityAPI = async (req, res) => {
+  try {
+    console.log('Testing Perplexity API...');
+    const testQuery = 'React hooks tutorial';
+    const videos = await searchYouTubeVideos(testQuery, 2);
+    
+    res.json({
+      success: true,
+      message: 'Perplexity API test completed',
+      query: testQuery,
+      videosFound: videos.length,
+      videos: videos,
+      apiConfigured: !!process.env.PERPLEXITY_API_KEY
+    });
+  } catch (error) {
+    console.error('Perplexity API test failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      apiConfigured: !!process.env.PERPLEXITY_API_KEY
+    });
+  }
+};
 
 export const generateRoadmap = async (req, res) => {
   const { topic, weeks } = req.body;
@@ -162,12 +188,26 @@ function formatRoadmapToMarkdown(roadmap) {
       if (week.youtube_videos) {
         md += `#### 🎥 YouTube Resources\n`;
         week.youtube_videos.forEach(v => {
-          if (v.search_query) {
-            md += `- **${v.title}** by ${v.channel}\n`;
-            md += `  - 🔍 Search: \`${v.search_query}\`\n`;
-            if (v.type) md += `  - Type: ${v.type}\n`;
-          } else if (v.url) {
-            md += `- [${v.title}](${v.url}) by ${v.channel}\n`;
+          // If we have a direct URL, use it
+          if (v.url) {
+            md += `- [${v.title}](${v.url}) by **${v.channel}**`;
+            if (v.type) md += ` - *${v.type}*`;
+            md += `\n`;
+          } 
+          // If we have a search query, create a clickable YouTube search link
+          else if (v.search_query) {
+            const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(v.search_query)}`;
+            md += `- [${v.title}](${searchUrl}) by **${v.channel}**`;
+            if (v.type) md += ` - *${v.type}*`;
+            md += `\n`;
+          }
+          // Fallback: create search from title and channel
+          else {
+            const searchQuery = `${v.channel} ${v.title}`;
+            const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(searchQuery)}`;
+            md += `- [${v.title}](${searchUrl}) by **${v.channel}**`;
+            if (v.type) md += ` - *${v.type}*`;
+            md += `\n`;
           }
         });
         md += `\n`;

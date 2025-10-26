@@ -12,6 +12,7 @@ import Chatbot from './pages/Chatbot'
 import Checklist from './pages/Checklist'
 import ChatHistory from './pages/ChatHistory'
 import RoadmapHistory from './pages/RoadmapHistory'
+import RoadmapView from './pages/RoadmapView'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import PlacementPrep from './pages/PlacementPrep'
@@ -157,6 +158,12 @@ export default function App() {
               <Route path="/roadmap-history" element={
                 <ProtectedRoute>
                   <RoadmapHistory />
+                </ProtectedRoute>
+              } />
+
+              <Route path="/roadmap/:id" element={
+                <ProtectedRoute>
+                  <RoadmapView />
                 </ProtectedRoute>
               } />
 

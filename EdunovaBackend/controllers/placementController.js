@@ -1,4 +1,5 @@
 import { askGemini, generateContent } from '../services/geminiService.js';
+import { verifyPlacementResources } from '../services/perplexityService.js';
 import Placement from '../models/Placement.js';
 
 export const generatePlacementContent = async (req, res) => {
@@ -99,211 +100,135 @@ Structure the guide with these sections:
 
 Format this professionally with clear markdown headers, bullet points, and actionable advice. Make it comprehensive but scannable.`;
 
-    // Generate resources with REAL links
-    const resourcesPrompt = `Generate a comprehensive list of learning resources to prepare for ${role} position at ${companyName}.
+    // Generate resources with REAL links using Perplexity
+    const resourcesPrompt = `Generate a comprehensive list of YouTube learning resources to prepare for ${role} position at ${companyName}.
 
-**CRITICAL: Provide REAL, WORKING resources. Use well-known platforms and channels.**
+**CRITICAL: Provide ONLY YouTube video/playlist recommendations. NO LeetCode, NO coding platforms, NO articles, NO blogs.**
+
+IMPORTANT REQUIREMENTS:
+- ONLY YouTube videos and playlists
+- Content from last 2 years (2023-2025)
+- From reputable educational channels
+- Focus on interview preparation, technical skills, and company-specific content
+- 8-12 diverse resources
 
 Return ONLY a JSON object in this exact format:
 {
   "youtube": [
     {
       "title": "<Descriptive title of what this video/playlist teaches>",
-      "channel": "<Channel name from: freeCodeCamp, Traversy Media, The Net Ninja, Academind, Programming with Mosh, Web Dev Simplified, Fireship, Tech With Tim, CS Dojo, etc.>",
-      "description": "<Why this is useful for the role>",
-      "type": "playlist|video"
-    }
-  ],
-  "coding_practice": [
-    {
-      "platform": "LeetCode|HackerRank|InterviewBit|CodeSignal",
-      "title": "<What to practice>",
-      "description": "<Specific problem patterns or lists>",
-      "difficulty": "Easy|Medium|Hard|Mixed",
-      "link_description": "<e.g., 'Search for Amazon tagged problems on LeetCode'>"
-    }
-  ],
-  "articles": [
-    {
-      "title": "<Article topic>",
-      "platform": "Medium|GeeksforGeeks|Dev.to|Company Engineering Blog",
-      "description": "<What you'll learn>",
-      "search_query": "<Exact search query to find this>"
-    }
-  ],
-  "github_repos": [
-    {
-      "title": "<Repository purpose>",
-      "description": "<What it contains>",
-      "topics": ["<topic1>", "<topic2>"],
-      "search_query": "<GitHub search query like 'interview preparation ${role}'>"
-    }
-  ],
-  "documentation": [
-    {
-      "title": "<Technology/Tool name>",
-      "type": "Official Docs|Tutorial|Guide",
-      "description": "<Why read this>",
-      "platform": "<Where to find it>"
-    }
-  ],
-  "courses": [
-    {
-      "title": "<Course name>",
-      "platform": "Udemy|Coursera|edX|YouTube",
-      "description": "<What it covers>",
-      "relevance": "<How it helps for ${companyName} ${role}>"
-    }
-  ],
-  "books": [
-    {
-      "title": "<Book name>",
-      "author": "<Author name>",
-      "description": "<What it covers>",
-      "relevance": "<Why it's important>"
-    }
-  ],
-  "company_specific": [
-    {
-      "type": "Engineering Blog|Tech Talks|Open Source Projects|Career Page",
-      "title": "<Resource title>",
-      "description": "<What to learn from it>",
-      "how_to_find": "<Where to look for this resource>"
+      "channel": "<Channel name - use well-known educational channels>",
+      "description": "<Why this is useful for ${role} at ${companyName}>",
+      "type": "Full Course|Tutorial|Interview Prep|Crash Course|Playlist",
+      "search_query": "<Exact search query: Channel name + topic + year>"
     }
   ]
 }
 
-IMPORTANT:
-- Provide 3-5 items per category
-- Focus on quality over quantity
-- Make sure resources are actually relevant to ${role} at ${companyName}
-- Include diverse learning formats
-- Prioritize free resources when possible`;
+Focus on:
+- Core technical skills for ${role}
+- Interview preparation strategies
+- System design (if applicable)
+- Behavioral interview tips
+- Company culture and values (if available)
+- Technology stack commonly used
 
-    // Get guidance and resources in parallel
+DO NOT include:
+- LeetCode or coding practice platforms
+- Articles or blog posts
+- Books or documentation
+- GitHub repositories
+- Any non-YouTube resources`;
+
+    // Get guidance and try to get verified resources from Perplexity
     console.log('Sending prompts to Gemini for:', companyName, 'and role:', role);
-    const [guidanceResponse, resourcesResponse] = await Promise.all([
-      generateContent(guidancePrompt, 4096),
-      generateContent(resourcesPrompt, 4096)
-    ]);
-    console.log('Received responses from Gemini');
-
-    // Parse resources JSON with robust error handling
-    let resources;
+    
+    // Try to get verified resources from Perplexity first
+    let perplexityResources = null;
     try {
-      console.log('Raw resources response length:', resourcesResponse.length);
-      
-      // Clean the response to extract JSON
-      let cleanedResourcesResponse = resourcesResponse
-        .replace(/```json\n?/gi, '')
-        .replace(/```\n?/gi, '')
-        .replace(/^[^{]*/, '') // Remove any text before {
-        .replace(/[^}]*$/, '') // Remove any text after }
-        .trim();
-      
-      // Try to find JSON object in the response
-      const jsonObjectMatch = cleanedResourcesResponse.match(/\{[\s\S]*\}/);
-      if (jsonObjectMatch) {
-        cleanedResourcesResponse = jsonObjectMatch[0];
+      console.log('Attempting to fetch verified resources from Perplexity...');
+      perplexityResources = await verifyPlacementResources(companyName, role);
+      if (perplexityResources && perplexityResources.youtube && perplexityResources.youtube.length > 0) {
+        console.log(`Got ${perplexityResources.youtube.length} verified YouTube resources from Perplexity`);
       }
+    } catch (perplexityError) {
+      console.error('Perplexity verification failed:', perplexityError);
+    }
+    
+    // Always get guidance from Gemini
+    const guidanceResponse = await generateContent(guidancePrompt, 4096);
+    console.log('Received guidance from Gemini');
+    
+    // If Perplexity didn't provide resources, get from Gemini as fallback
+    let resources;
+    if (perplexityResources && perplexityResources.youtube && perplexityResources.youtube.length > 0) {
+      console.log('Using Perplexity-verified resources');
+      resources = perplexityResources;
+    } else {
+      console.log('Perplexity resources unavailable, using Gemini fallback');
+      const resourcesResponse = await generateContent(resourcesPrompt, 4096);
       
-      console.log('Cleaned response length:', cleanedResourcesResponse.length);
-      
-      resources = JSON.parse(cleanedResourcesResponse);
-      
-      // Validate resources format
-      if (typeof resources !== 'object' || Array.isArray(resources)) {
-        throw new Error('Invalid resources format - not an object');
+      // Parse resources JSON with robust error handling
+      try {
+        console.log('Raw resources response length:', resourcesResponse.length);
+        
+        // Clean the response to extract JSON
+        let cleanedResourcesResponse = resourcesResponse
+          .replace(/```json\n?/gi, '')
+          .replace(/```\n?/gi, '')
+          .replace(/^[^{]*/, '') // Remove any text before {
+          .replace(/[^}]*$/, '') // Remove any text after }
+          .trim();
+        
+        // Try to find JSON object in the response
+        const jsonObjectMatch = cleanedResourcesResponse.match(/\{[\s\S]*\}/);
+        if (jsonObjectMatch) {
+          cleanedResourcesResponse = jsonObjectMatch[0];
+        }
+        
+        console.log('Cleaned response length:', cleanedResourcesResponse.length);
+        
+        resources = JSON.parse(cleanedResourcesResponse);
+        
+        // Validate resources format
+        if (typeof resources !== 'object' || Array.isArray(resources)) {
+          throw new Error('Invalid resources format - not an object');
+        }
+
+        console.log('Successfully parsed resources from Gemini');
+
+      } catch (parseError) {
+        console.error('Error parsing resources JSON:', parseError.message);
+        console.error('Response that failed:', resourcesResponse.substring(0, 500));
+        
+        // Fallback resources structure with only YouTube
+        resources = {
+          youtube: [
+            {
+              title: `${role} Interview Preparation`,
+              channel: "freeCodeCamp",
+              description: "Comprehensive interview preparation for the role",
+              type: "Full Course",
+              search_query: `freeCodeCamp ${role} interview 2024`
+            },
+            {
+              title: `${companyName} Interview Experience and Tips`,
+              channel: "Tech Interview Pro",
+              description: "Learn from real interview experiences and expert tips",
+              type: "Interview Prep",
+              search_query: `${companyName} ${role} interview experience 2024`
+            },
+            {
+              title: `Technical Skills for ${role}`,
+              channel: "Programming with Mosh",
+              description: "Master the technical skills required for the role",
+              type: "Tutorial",
+              search_query: `Programming with Mosh ${role} tutorial 2024`
+            }
+          ]
+        };
+        console.log('Using fallback resources');
       }
-
-      console.log('Successfully parsed resources');
-
-    } catch (parseError) {
-      console.error('Error parsing resources JSON:', parseError.message);
-      console.error('Response that failed:', resourcesResponse.substring(0, 500));
-      
-      // Fallback resources structure
-      resources = {
-        youtube: [
-          {
-            title: `${role} Interview Preparation`,
-            channel: "freeCodeCamp",
-            description: "Comprehensive interview preparation videos",
-            type: "playlist"
-          },
-          {
-            title: `${companyName} Interview Experience`,
-            channel: "Tech With Tim",
-            description: "Learn from real interview experiences",
-            type: "video"
-          }
-        ],
-        coding_practice: [
-          {
-            platform: "LeetCode",
-            title: `${companyName} Tagged Problems`,
-            description: "Practice problems frequently asked by the company",
-            difficulty: "Mixed",
-            link_description: `Search for '${companyName}' tagged problems on LeetCode`
-          },
-          {
-            platform: "InterviewBit",
-            title: `${role} Practice Track`,
-            description: "Structured practice for the role",
-            difficulty: "Mixed",
-            link_description: "Complete the structured interview preparation track"
-          }
-        ],
-        articles: [
-          {
-            title: `How to Crack ${companyName} Interview`,
-            platform: "GeeksforGeeks",
-            description: "Interview preparation guide",
-            search_query: `${companyName} interview preparation`
-          }
-        ],
-        github_repos: [
-          {
-            title: "Interview Preparation Kit",
-            description: "Comprehensive collection of interview resources",
-            topics: ["interviews", "coding", role.toLowerCase()],
-            search_query: `${role} interview preparation`
-          }
-        ],
-        documentation: [
-          {
-            title: "Core Technologies Documentation",
-            type: "Official Docs",
-            description: "Study official documentation of technologies used",
-            platform: "Official websites"
-          }
-        ],
-        courses: [
-          {
-            title: `${role} Interview Preparation`,
-            platform: "YouTube",
-            description: "Free comprehensive course",
-            relevance: "Covers all essential topics"
-          }
-        ],
-        books: [
-          {
-            title: "Cracking the Coding Interview",
-            author: "Gayle Laakmann McDowell",
-            description: "Classic interview preparation book",
-            relevance: "Essential for technical interviews"
-          }
-        ],
-        company_specific: [
-          {
-            type: "Engineering Blog",
-            title: `${companyName} Engineering Blog`,
-            description: "Learn about the company's tech stack and challenges",
-            how_to_find: `Search for '${companyName} engineering blog' or visit company website`
-          }
-        ]
-      };
-      console.log('Using fallback resources');
     }
 
     // Save to database if user is authenticated

@@ -1,5 +1,6 @@
 ﻿import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
+import { searchYouTubeVideos } from './perplexityService.js';
 
 dotenv.config();
 
@@ -51,42 +52,7 @@ export const generateContent = async (prompt, maxTokens = 4096) => {
 export const generateStructuredRoadmap = async (topic, weeks) => {
   const prompt = `Generate a comprehensive ${weeks}-week learning roadmap for "${topic}".
 
-CRITICAL INSTRUCTIONS FOR YOUTUBE RECOMMENDATIONS:
-1. Provide 2-3 YouTube video/playlist SEARCH RECOMMENDATIONS per week
-2. Use DIVERSE, HIGH-QUALITY educational channels (mix different creators, don't repeat same channels)
-3. ONLY recommend content from channels known for ${topic}
-4. Content should be recent (uploaded within last 2-2.5 years when possible)
-
-RECOMMENDED CHANNELS BY CATEGORY:
-**Web Development:**
-- Traversy Media, The Net Ninja, Kevin Powell, Web Dev Simplified, Fireship, Dave Gray, JavaScript Mastery, Coding Addict
-
-**Programming/CS:**
-- freeCodeCamp, Programming with Mosh, Tech With Tim, Corey Schafer, CS Dojo, CodeWithHarry
-
-**Python/Data Science:**
-- Tech With Tim, Corey Schafer, Krish Naik, CodeBasics, sentdex, Keith Galli
-
-**React/Frontend:**
-- Traversy Media, JavaScript Mastery, Academind, PedroTech, Coding Addict, Dave Gray
-
-**Backend/Databases:**
-- Traversy Media, Hussein Nasser, Fireship, Ben Awad, Caleb Curry
-
-**DevOps/Cloud:**
-- TechWorld with Nana, Fireship, NetworkChuck, Cloud Advocate
-
-**Mobile Development:**
-- The Net Ninja, Academind, Traversy Media, Programming with Mosh
-
-IMPORTANT:
-- For each recommendation, provide SEARCH INSTRUCTIONS (e.g., "Search: React Complete Course 2024 Traversy Media")
-- DO NOT generate fake video URLs
-- Provide channel name + specific search query
-- Vary the channels across weeks
-- Mention if it's a full course/tutorial/crash course
-
-Return ONLY valid JSON in this exact format:
+Return ONLY valid JSON in this exact format (YouTube videos will be added separately):
 {
   "topic": "${topic}",
   "duration_weeks": ${weeks},
@@ -98,14 +64,6 @@ Return ONLY valid JSON in this exact format:
       "week": 1,
       "title": "Week 1: <Title>",
       "topics": ["topic1", "topic2", "topic3"],
-      "youtube_videos": [
-        {
-          "title": "<Specific topic/concept to learn>",
-          "search_query": "<Channel Name> <Specific search terms> <Year if relevant>",
-          "channel": "<channel name>",
-          "type": "Full Course|Tutorial|Crash Course|Playlist"
-        }
-      ],
       "difficulty": "Beginner|Intermediate|Advanced",
       "estimated_hours": <number>
     }
@@ -121,17 +79,7 @@ Return ONLY valid JSON in this exact format:
   ]
 }
 
-EXAMPLE:
-{
-  "youtube_videos": [
-    {
-      "title": "React Fundamentals and Hooks",
-      "search_query": "Traversy Media React Crash Course 2024",
-      "channel": "Traversy Media",
-      "type": "Crash Course"
-    }
-  ]
-}`;
+Focus on creating a comprehensive learning path with clear topics for each week. YouTube resources will be added automatically using AI-powered search.`;
 
   try {
     const result = await model.generateContent(prompt);
@@ -150,19 +98,26 @@ EXAMPLE:
       throw new Error('Invalid roadmap structure: missing milestones');
     }
 
-    // Validate YouTube links format
-    roadmapData.milestones.forEach((milestone, idx) => {
-      if (milestone.youtube_videos) {
-        milestone.youtube_videos = milestone.youtube_videos.map(video => {
-          // Ensure required fields exist
-          if (!video.search_query && !video.url) {
-            console.warn(`Missing search_query in week ${idx + 1}`);
-            video.search_query = `${video.channel} ${video.title}`;
-          }
-          return video;
-        });
+    // Add YouTube videos using Perplexity for each week
+    console.log('Fetching YouTube videos using Perplexity AI...');
+    for (let i = 0; i < roadmapData.milestones.length; i++) {
+      const milestone = roadmapData.milestones[i];
+      try {
+        // Create a search query combining topic and week topics
+        const weekTopics = milestone.topics ? milestone.topics.join(', ') : milestone.title;
+        const searchQuery = `${topic} ${weekTopics}`;
+        
+        // Fetch 2-3 videos for this week using Perplexity
+        const videos = await searchYouTubeVideos(searchQuery, 3);
+        milestone.youtube_videos = videos;
+        
+        console.log(`Added ${videos.length} videos for Week ${milestone.week}`);
+      } catch (error) {
+        console.error(`Error fetching videos for week ${milestone.week}:`, error);
+        // Continue with next week if this one fails
+        milestone.youtube_videos = [];
       }
-    });
+    }
 
     return roadmapData;
   } catch (error) {
